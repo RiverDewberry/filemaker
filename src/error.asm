@@ -37,7 +37,7 @@ _fileErrLoop:
 
 	mov rax, 1
 	mov rdi, 1
-	mov rsi, fileErrEnd
+	mov rsi, fileMsgEnd
 	mov rdx, 3
 	syscall		;prints error
 

@@ -2,6 +2,20 @@
 %include "./options.asm"
 
 %macro createFile 0	;makes file from const char* in rdi
+	cmp byte [verbose], 0
+	je %%nonVerbose
+
+	mov rax, verboseFileMsg
+	call _printStr
+
+	mov rax, rdi
+	call _printStr
+
+	mov rax, fileMsgEnd
+	call _printStr
+
+%%nonVerbose:
+
 	mov rax, 2
 	mov rsi, 64
 	mov rdx, 0o644
@@ -52,3 +66,28 @@ _exit:
 	mov rax, 60
 	mov rdi, 0
 	syscall		;exits program with err 0
+
+_printStr:		;prints the null terminated string in rax
+	push rcx
+	push rdx
+	push rdi
+	push rsi	;stores registers
+
+	xor rdx, rdx
+
+_printLoop:
+	inc rdx
+	mov byte cl, [rax + rdx]
+	cmp cl, 0
+	jnz _printLoop	;loop finds strlen and puts it in rbx
+
+	mov rsi, rax
+	mov rax, 1
+	mov rdi, 1
+	syscall		;prints
+
+	pop rsi
+	pop rdi
+	pop rdx
+	pop rcx		;restores registers
+	ret

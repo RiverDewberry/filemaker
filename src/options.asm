@@ -25,6 +25,8 @@
 	cmp al, '-'	
 	jne %%endParse ;stops parsing if normal arg
 
+	cmp rbx, 0
+	je _noOpErr	;ends program if 0 args left
 	pop rdi
 	dec rbx		;updates arg counter
 
@@ -34,13 +36,13 @@
 	cmp al, '-'
 	je %%parseStrOpt;parses options that need str comparison
 
-	cmp al, 'v'
-	je %%versionShort;parses options that need str comparison
-
 %%parseNextOpt:
 
 	mov byte al, [1 + rdi + rcx]
 			;sets al to the next byte of the options
+
+	cmp al, 'v'
+	je %%verbose	;checks for -v
 
 	cmp al, 'e'
 	je %%endArgs	;stops parsing if -e
@@ -65,9 +67,18 @@
 	cmp rax, 1
 	je %%version	;checks for --version
 
+	mov rax, endOpt
+	call _strCmp
+	cmp rax, 1
+	je %%endParse	;checks for --end
+
 	jmp _optErr
 
 %%octalMode:
+	cmp byte [modeset], 1
+	je _optErr	;errors if mode already set
+
+	mov byte [modeset], 1
 
 	checkOctal 2
 	checkOctal 3
@@ -86,6 +97,10 @@
 			;parses next opt
 
 %%octalPerms:
+	cmp byte [modeset], 1
+	je _optErr	;errors if mode already set
+
+	mov byte [modeset], 1
 
 	checkOctal 2
 	checkOctal 3
@@ -102,11 +117,19 @@
 	jmp %%parseNextOpt
 			;parses next opt
 
-%%versionShort:
+%%verbose:
+	cmp byte [verbose], 1
+	je _optErr	;errors if already verbose
 
-	mov byte al, [2 + rdi]
+	mov byte [verbose], 1
+			;sets verbose to true
+
+	mov byte al, [2 + rdi + rcx]
 	cmp al, 0
-	jnz _optErr	;if anything is after -v
+	jz %%parseNextArg
+
+	add rcx, 1
+	jmp %%parseNextOpt
 
 %%version:		;prints the version num
 
@@ -123,7 +146,7 @@
 	mov rax, 1
 	mov rdi, 1
 	mov rsi, helpMsg
-	mov rdx, 379
+	mov rdx, 414
 	syscall
 	jmp _exit
 
@@ -139,8 +162,13 @@
 section .data
 	helpOpt db "--help",0
 	versionOpt db "--version",0
+	endOpt db "--end",0
 	mode dd 0o644
+	modeset db 0	;if mode has been set
+	verbose db 0
 
+	global verbose
+	global modeset
 	global mode
 	global helpOpt
 	global versionOpt
