@@ -1,27 +1,11 @@
-%macro createFile 0	;makes file from const char* in rdi
-	mov rax, 2
-	mov rsi, 64
-	mov rdx, 0o644
-	syscall		;creates file from path
-
-	mov rdx, rax	;stores rax
-
-	cmp rax, 0xffff_ffff_ffff_efff
-	ja _fileErr
-
-	mov rsi, [mode]
-	mov rax, 90
-	syscall		;sets perms
-
-	mov rax, rdx	;restores rdx
-
-	mov rdi, rax
-	mov rax, 3
-	syscall		;closes the file
-%endmacro
+%ifdef OPT_ASM
+;do nothing
+%else
+%define OPT_ASM
+%include "./messages.asm"
 
 %macro checkOctal 1	;checks if char at offset is valid octal, if it is, shifts into rdx
-	mov al, [%1 + rdi + rcx]
+	mov byte al, [%1 + rdi + rcx]
 	cmp al, 0x30
 	jl _optErr
 	cmp al, 0x37
@@ -35,8 +19,8 @@
 %macro parseOptions 0	;parses command line args
 %%parseNextArg:
 	xor rcx, rcx	;sets rcx to 0
-	mov rdi, [rsp]	;gets the val of the first non path arg
-	mov al, [rdi]	;sets al to the first byte of the possible options arg
+	mov qword rdi, [rsp]	;gets the val of the first non path arg
+	mov byte al, [rdi]	;sets al to the first byte of the possible options arg
 	
 	cmp al, '-'	
 	jne %%endParse ;stops parsing if normal arg
@@ -44,7 +28,7 @@
 	pop rdi
 	dec rbx		;updates arg counter
 
-	mov al, [1 + rdi]
+	mov byte al, [1 + rdi]
 		;sets al to the first byte to parse args
 
 	cmp al, '-'
@@ -55,7 +39,7 @@
 
 %%parseNextOpt:
 
-	mov al, [1 + rdi + rcx]
+	mov byte al, [1 + rdi + rcx]
 			;sets al to the next byte of the options
 
 	cmp al, 'e'
@@ -92,7 +76,7 @@
 
 	mov [mode], rdx	;sets mode to rdx
 
-	mov al, [6 + rdi + rcx]
+	mov byte al, [6 + rdi + rcx]
 	cmp al, 0
 	jz %%parseNextArg
 			;parses next arg if nothing after -mOOOO
@@ -109,7 +93,7 @@
 
 	mov [mode], rdx;sets mode to rdx
 
-	mov al, [5 + rdi + rcx]
+	mov byte al, [5 + rdi + rcx]
 	cmp al, 0
 	jz %%parseNextArg
 			;parses next arg if nothing after -pOOO
@@ -120,7 +104,7 @@
 
 %%versionShort:
 
-	mov al, [2 + rdi]
+	mov byte al, [2 + rdi]
 	cmp al, 0
 	jnz _optErr	;if anything is after -v
 
@@ -145,7 +129,7 @@
 
 %%endArgs:		;stops parsing args
 
-	mov al, [2 + rdi + rcx]
+	mov byte al, [2 + rdi + rcx]
 	cmp al, 0
 	jne _optErr	;errors if anything after -e
 
@@ -153,102 +137,17 @@
 %endmacro
 
 section .data
-	
-	optionError db "mk: invalid options.",0x0a,"Try 'mk --help' for a list of valid options.",0x0a
-	noOperandError db "mk: no operand.",0x0a,"Try 'mk --help' for more information.",0x0a
-	fileErr db "mk: cannot create file '"
-	fileErrEnd db "'.",0x0a
-	helpMsg db "Usage: [OPTION]... FILENAME...",0x0a,"Create FILENAME(S), if they do not already exist",0x0a,0x0a,"Options:",0x0a,"  -pOOO set file perms on created files to the octal OOO",0x0a,"  -mOOOO set file mode on created files to the octal value OOOO",0x0a,"  -e mark end of OPTION(s), useful if you want to make a file that starts with '-'",0x0a,"  -v --version print version number and exit",0x0a,"  --help display this help msg and exit",0x0a
-	versionNum db "mk 1.0",0x0a
-	
-	mode dd 0o644
-
 	helpOpt db "--help",0
 	versionOpt db "--version",0
+	mode dd 0o644
 
+	global mode
+	global helpOpt
+	global versionOpt
 
 section .text
-	global _start
-
-_start:
-	pop rbx		;argc into rbx
-	pop rdi		;removes path arg
-	dec rbx		;sets counter to new number of args
-
-	cmp rbx, 1
-	jl _noOpErr	;ends program if 0 args
-
-	parseOptions	;parses options (if any)
-
-	cmp rbx, 1
-	jl _noOpErr	;ends program if 0 file args
-
-_argLoop:		;loops through all args
-	pop rdi		;file to be created
-
-	createFile	;makes file
-
-	dec rbx
-	cmp rbx, 0
-	jnz _argLoop	;ends program if 0 file args
-
-_exit:
-	mov rax, 60
-	mov rdi, 0
-	syscall		;exits program with err 0
-
-_fileErr:		;if file can not be created
-
-	xor rax, rax
-
-_fileErrLoop:
-	inc rax
-	mov dl, [rdi + rax]
-	cmp dl, 0
-	jne _fileErrLoop;finds size of file name
 	
-	mov rbx, rax	;stores name length
-	mov r8, rdi	;stores name ptr
-
-	mov rax, 1
-	mov rdi, 1
-	mov rsi, fileErr
-	mov rdx, 24
-	syscall
-
-	mov rax, 1
-	mov rdi, 1
-	mov rsi, r8
-	mov rdx, rbx
-	syscall
-
-	mov rax, 1
-	mov rdi, 1
-	mov rsi, fileErrEnd
-	mov rdx, 3
-	syscall		;prints error
-
-	jmp _err
-
-_noOpErr:		;if no operand if given
-	mov rax, 1
-	mov rdi, 1
-	mov rsi, noOperandError
-	mov rdx, 54
-	syscall		;prints error mesage
-	jmp _err	;exits with error
-
-_optErr:		;if invalid options
-	mov rax, 1
-	mov rdi, 1
-	mov rsi, optionError
-	mov rdx, 66
-	syscall		;prints error mesage
-
-_err:			;exits with an error
-	mov rax, 60
-	mov rdi, 1
-	syscall		;exits with error 1
+	global _strCmp
 
 _strCmp:		;compares 2 null terminated strings (in rax and rdi)
 			;rax = 1 if the strings are equal, otherwise, rax = 0
@@ -260,8 +159,8 @@ _strCmp:		;compares 2 null terminated strings (in rax and rdi)
 	xor rbx, rbx	;sets rdx to 0
 
 _strCmpLoop:
-	mov cl, [rax + rbx]
-	mov dl, [rdi + rbx]
+	mov byte cl, [rax + rbx]
+	mov byte dl, [rdi + rbx]
 	inc rbx		;gets next chars of the strings
 	
 	cmp cl, dl
@@ -290,3 +189,4 @@ _strEQ:			;if the strings are equal
 	pop rbx		;restores registers
 
 	ret
+%endif
