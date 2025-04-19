@@ -15,4 +15,4 @@ Usage: [OPTION]... FILENAME...
   
     --version print version number and exit
   
-    --help display this help msg and exit
+    --help display help msg and exit
