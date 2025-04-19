@@ -1,7 +1,9 @@
 # filemaker
 A very basic cli tool written in asm for creating empty file(s)
 
+
 Usage: [OPTION]... FILENAME...
+
 Create FILENAME(S), if they do not already exist
 
 Options:
