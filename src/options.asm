@@ -18,6 +18,9 @@
 
 %macro parseOptions 0	;parses command line args
 %%parseNextArg:
+	cmp rbx, 0
+	je _noOpErr	;ends program if 0 args left
+
 	xor rcx, rcx	;sets rcx to 0
 	mov qword rdi, [rsp]	;gets the val of the first non path arg
 	mov byte al, [rdi]	;sets al to the first byte of the possible options arg
@@ -25,8 +28,6 @@
 	cmp al, '-'	
 	jne %%endParse ;stops parsing if normal arg
 
-	cmp rbx, 0
-	je _noOpErr	;ends program if 0 args left
 	pop rdi
 	dec rbx		;updates arg counter
 
@@ -52,6 +53,9 @@
 
 	cmp al, 'm'
 	je %%octalMode	;parses mode
+
+	cmp al, 'd'
+	je %%dirs	;parses dirs
 
 	jmp _optErr	;if arg is not a valid option
 
@@ -131,6 +135,20 @@
 	add rcx, 1
 	jmp %%parseNextOpt
 
+%%dirs:
+	cmp byte [dirs], 1
+	je _optErr	;errors if already dirs
+
+	mov byte [dirs], 1
+			;sets dirs to true
+
+	mov byte al, [2 + rdi + rcx]
+	cmp al, 0
+	jz %%parseNextArg
+
+	add rcx, 1
+	jmp %%parseNextOpt
+
 %%version:		;prints the version num
 
 	mov rax, 1
@@ -146,7 +164,7 @@
 	mov rax, 1
 	mov rdi, 1
 	mov rsi, helpMsg
-	mov rdx, 414
+	mov rdx, 471
 	syscall
 	jmp _exit
 
@@ -166,7 +184,9 @@ section .data
 	mode dd 0o644
 	modeset db 0	;if mode has been set
 	verbose db 0
+	dirs db 0
 
+	global dirs
 	global verbose
 	global modeset
 	global mode

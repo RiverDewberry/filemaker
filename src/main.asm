@@ -2,7 +2,15 @@
 %include "./options.asm"
 
 %macro createFile 0	;makes file from const char* in rdi
-	cmp byte [verbose], 0
+
+	cmp byte [dirs], 0
+	je %%dontMakeDirs
+	mov rax, rdi
+	call _mkdirs
+
+%%dontMakeDirs:
+
+cmp byte [verbose], 0
 	je %%nonVerbose
 
 	mov rax, verboseFileMsg
@@ -90,4 +98,60 @@ _printLoop:
 	pop rdi
 	pop rdx
 	pop rcx		;restores registers
+	ret
+
+_mkdirs:		;attempts to make all dirs in a path given by a null
+			;terminated string in rax
+	
+	push rdx
+	push rbx
+	push rdi
+	push rsi
+
+	xor rdx, rdx
+
+_mkdirLoop:
+	inc rdx
+	mov bl, [rax + rdx]
+
+	cmp bl, 0x2f	;finds segments of the arg that are dirs
+	jne _mkdirIfEnd
+
+	mov byte [rax + rdx], 0
+
+	push rax
+
+	mov rdi, rax
+	mov rsi, 0o755
+	mov rax, 83
+	syscall
+
+	cmp byte [verbose], 0
+	je _noMsg
+
+	mov rax, verboseDirMsg
+	call _printStr
+
+	mov rax, rdi
+	call _printStr
+
+	mov rax, fileMsgEnd
+	call _printStr
+
+_noMsg:
+
+	pop rax
+
+	mov byte [rax + rdx], 0x2f
+
+_mkdirIfEnd:
+
+	cmp bl, 0
+	jnz _mkdirLoop	;ends loop at end of arg
+
+	pop rsi
+	pop rdi
+	pop rbx
+	pop rdx
+
 	ret
